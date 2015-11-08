@@ -88,7 +88,7 @@ namespace ServiceToServiceHost
         {
             if (!_isRunning)
             {
-                L.ExchangerLog.Warn("Current Host not running, CreateNewConnectToRemoteHost is Aborted");
+                L.Log.Warn("Current Host not running, CreateNewConnectToRemoteHost is Aborted");
                 return;
             }
 
@@ -232,7 +232,7 @@ namespace ServiceToServiceHost
                 }
                 catch (Exception ex)
                 {
-                    L.ExchangerLog.Error("Disposadle error, Ex: {0}", ex);
+                    L.Log.Error("Disposadle error, Ex: {0}", ex);
                 }
             }                          
         }

@@ -163,7 +163,7 @@ namespace ServiceToServiceHost
         private void newConnect()
         {
             _serviceConnection = _createNewServiceChannelFactory().CreateChannel();
-            L.ExchangerLog.Info("Create new connection to {0}", _endpointAddress);
+            L.Log.Info("Create new connection to {0}", _endpointAddress);
         }
         
         private void onReconnect()
@@ -199,9 +199,9 @@ namespace ServiceToServiceHost
                     }
                     catch (Exception ex)
                     {
-                        L.ExchangerLog.Warn(string.Format("Try: {0}/{1}, To: {2}, ExType: {3}", tryCounter + 1,
+                        L.Log.Warn("Try: {0}/{1}, To: {2}, ExType: {3}", tryCounter + 1,
                             _connectionSettings.MaxTryCountCallServiceMethodIfLostConnection, _endpointAddress,
-                            ex.GetType()));
+                            ex.GetType());
 
                         _connectionIsOk = false;
                         if ((tryCounter - _connectionSettings.MaxTryCountCallServiceMethodIfLostConnection) != 1)

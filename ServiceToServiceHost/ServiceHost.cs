@@ -44,12 +44,12 @@ namespace ServiceToServiceHost
             try
             {
                 Instance.Open();
-                L.ExchangerLog.Info("ExchangerServiceHost is Running, Listening port: {0}", Instance.Description.Endpoints[0].Address.Uri.Port);
+                L.Log.Info("ExchangerServiceHost is Running, Listening port: {0}", Instance.Description.Endpoints[0].Address.Uri.Port);
                 return true;
             }
             catch (Exception ex)
             {
-                L.ExchangerLog.Info("ExchangerServiceHost running error. Listening port: {0}, Ex: {1}, {2}", Instance.Description.Endpoints[0].Address.Uri.Port, ex.GetType(), ex.Message);
+                L.Log.Info("ExchangerServiceHost running error. Listening port: {0}, Ex: {1}, {2}", Instance.Description.Endpoints[0].Address.Uri.Port, ex.GetType(), ex.Message);
             }
             return false;
         }

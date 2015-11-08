@@ -39,9 +39,6 @@
     <Reference Include="Ninject">
       <HintPath>..\Ninject.3.2.2.0\lib\net45-full\Ninject.dll</HintPath>
     </Reference>
-    <Reference Include="NLog">
-      <HintPath>..\NLog.3.1.0.0\lib\net45\NLog.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Runtime.Serialization" />
@@ -66,17 +63,13 @@
     <Compile Include="HostManagerFactory.cs" />
     <Compile Include="ServiceHost.cs" />
     <Compile Include="HostManager.cs" />
-    <Compile Include="L.cs" />
+    <Compile Include="Logger.cs" />
     <Compile Include="ConnectionToService.cs" />
     <Compile Include="NInjectInstanceProvider.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
-    <None Include="NLog.config">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-      <SubType>Designer</SubType>
-    </None>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

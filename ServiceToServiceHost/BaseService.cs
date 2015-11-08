@@ -76,7 +76,7 @@ namespace ServiceToServiceHost
                 if (contains != null)
                 {
                     if (i == 0)
-                        L.ExchangerLog.Info("Contains from: {0}, Connections: {1}, IncomingOperation: {2}", remoteHostAdress, _hostManagerInternalOperations.Connections.Count, contains.IncomingOperation);
+                        L.Log.Info("Contains from: {0}, Connections: {1}, IncomingOperation: {2}", remoteHostAdress, _hostManagerInternalOperations.Connections.Count, contains.IncomingOperation);
 
                     //обновляем
                     contains.Incoming = CurrentOperationContext;
@@ -108,7 +108,7 @@ namespace ServiceToServiceHost
             lock (_hostManagerInternalOperations.ConnectionsSync)
                 _hostManagerInternalOperations.Connections.Add(CurrentConnection);
 
-            L.ExchangerLog.Info("Add from: {0}, Connections: {1}", CurrentConnection.RemoteHostAdress, _hostManagerInternalOperations.Connections.Count);
+            L.Log.Info("Add from: {0}, Connections: {1}", CurrentConnection.RemoteHostAdress, _hostManagerInternalOperations.Connections.Count);
 
             _hostManagerInternalOperations.OnNewIcomingConnection(CurrentConnection);
         }

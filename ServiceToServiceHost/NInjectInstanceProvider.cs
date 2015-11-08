@@ -64,11 +64,11 @@ namespace ServiceToServiceHost
 
             if (errType == typeof (BlockingIncomingOperationException))
             {
-                L.ExchangerLog.Warn("{0}", error.Message);
+                L.Log.Warn(error.Message);
                 return false;
             }
 
-            L.ExchangerLog.Error("{0}", error);                           
+            L.Log.Error(error.ToString());                           
             return false;
         }
     }
