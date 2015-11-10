@@ -36,73 +36,42 @@ namespace ServiceToServiceHost
         {
             _logger = logger;
         }
-
         public void Error(string message)
         {
-            if (_logger == null) 
-                return;
-
-            message = string.Format("Error {0}: {1}", (new StackTrace()).GetFrame(1).GetMethod().Name, message);
-            _logger.Append(message);
+            append("ERROR", (new StackTrace()).GetFrame(1).GetMethod().Name, message);
         }
         public void Error(string format, params object[] args)
         {
-            if (_logger == null)
-                return;
-
-            format = string.Format("Info {0}: {1}", (new StackTrace()).GetFrame(1).GetMethod().Name, string.Format(null, format, args));
-            _logger.Append(format);
+            append("ERROR", (new StackTrace()).GetFrame(1).GetMethod().Name, string.Format(null, format, args));
         }
-
         public void Info(string message)
         {
-            if (_logger == null)
-                return;
-
-            message = string.Format("Info {0}: {1}", (new StackTrace()).GetFrame(1).GetMethod().Name, message);
-            _logger.Append(message);
+            append("INFO", (new StackTrace()).GetFrame(1).GetMethod().Name, message);
         }
         public void Info(string format, params object[] args)
         {
-            if (_logger == null)
-                return;
-
-            format = string.Format("Info {0}: {1}", (new StackTrace()).GetFrame(1).GetMethod().Name, string.Format(null, format, args));
-            _logger.Append(format);
+            append("INFO", (new StackTrace()).GetFrame(1).GetMethod().Name, string.Format(null, format, args));
         }
-
         public void Warn(string message)
         {
-            if (_logger == null)
-                return;
-
-            message = string.Format("Warn {0}: {1}", (new StackTrace()).GetFrame(1).GetMethod().Name, message);
-            _logger.Append(message);
+            append("WARN", (new StackTrace()).GetFrame(1).GetMethod().Name, message);
         }
         public void Warn(string format, params object[] args)
         {
-            if (_logger == null)
-                return;
-
-            format = string.Format("Info {0}: {1}", (new StackTrace()).GetFrame(1).GetMethod().Name, string.Format(null, format, args));
-            _logger.Append(format);
+            append("WARN", (new StackTrace()).GetFrame(1).GetMethod().Name, string.Format(null, format, args));
         }
-
         public void Fatal(string message)
         {
-            if (_logger == null)
-                return;
-
-            message = string.Format("Fatal {0}: {1}", (new StackTrace()).GetFrame(1).GetMethod().Name, message);
-            _logger.Append(message);
+            append("FATAL", (new StackTrace()).GetFrame(1).GetMethod().Name, message);
         }
         public void Fatal(string format, params object[] args)
         {
-            if (_logger == null)
-                return;
-
-            format = string.Format("Info {0}: {1}", (new StackTrace()).GetFrame(1).GetMethod().Name, string.Format(null, format, args));
-            _logger.Append(format);
+            append("FATAL", (new StackTrace()).GetFrame(1).GetMethod().Name, string.Format(null, format, args));
+        }
+        private void append(string logError, string methodName, string logMessage)
+        {
+            if (_logger != null)
+                _logger.Append(string.Format("{0} {1}: {2}", logError, methodName, logMessage));
         }
     }
 }

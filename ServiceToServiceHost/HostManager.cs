@@ -47,11 +47,10 @@ namespace ServiceToServiceHost
         private readonly EventWaitHandle _eventWaitHandle = new EventWaitHandle(false, EventResetMode.AutoReset);
         public HostManager(string hostingPort, IKernel ninjectKernel = null)
         {            
-            var type = typeof(TService);
-            _endpointServiceName = type.UnderlyingSystemType.Name;
             _hostingPort = hostingPort;
-            Connections = new List<IConnection<TConnectionData, TImplementedContract>>();
             createServiceBehavior(ninjectKernel);
+            _endpointServiceName = typeof(TService).UnderlyingSystemType.Name;
+            Connections = new List<IConnection<TConnectionData, TImplementedContract>>();
 
             _hostThread = new Thread(host);
             _hostThread.Start();

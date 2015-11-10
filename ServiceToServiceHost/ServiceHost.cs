@@ -41,15 +41,16 @@ namespace ServiceToServiceHost
 
         public bool Run()
         {
+            var hostTypeName = typeof(TService).UnderlyingSystemType.Name;
             try
             {
                 Instance.Open();
-                L.Log.Info("ExchangerServiceHost is Running, Listening port: {0}", Instance.Description.Endpoints[0].Address.Uri.Port);
+                L.Log.Info("{0} Host is Running, Listening port: {1}", hostTypeName, Instance.Description.Endpoints[0].Address.Uri.Port);
                 return true;
             }
             catch (Exception ex)
             {
-                L.Log.Info("ExchangerServiceHost running error. Listening port: {0}, Ex: {1}, {2}", Instance.Description.Endpoints[0].Address.Uri.Port, ex.GetType(), ex.Message);
+                L.Log.Info("{0} Host running error. Listening port: {1}, Ex: {2}, {3}", hostTypeName, Instance.Description.Endpoints[0].Address.Uri.Port, ex.GetType(), ex.Message);
             }
             return false;
         }
