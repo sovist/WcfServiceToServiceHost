@@ -27,19 +27,27 @@ namespace ServiceToServiceHost
         where TService : BaseService<TService, TImplementedContract, TConnectionData>, TImplementedContract
     {
         public List<IConnection<TConnectionData, TImplementedContract>> Connections { get; private set; }
-        public object ConnectionsSync { get { return _connectionsSync; } }
+        public object ConnectionsSync { get; } = new object();
         public IHost Host { get; private set; }
+        /// <summary>
+        /// происходит при новом входящем подключении
+        /// </summary>
         public event Action<NewIcomingConnectionEventArgs<TConnectionData>> IcomingConnection;
-        public event Action<IConnectionData<TConnectionData>> Reconnect;
+        /// <summary>
+        /// происходит при переподключении
+        /// </summary>
+        //public event Action<IConnectionData<TConnectionData>> Reconnect;
+        /// <summary>
+        /// происходит при потересоединения
+        /// </summary>
         public event Action<IConnectionData<TConnectionData>> LostConnection;
+        /// <summary>
+        /// происходит при удачном подключении
+        /// </summary>
+        public event Action<IConnectionData<TConnectionData>> Connected;
 
-        public string HostingPort
-        {
-            get { return _hostingPort; }
-        }
+        public string HostingPort { get; }
 
-        private readonly object _connectionsSync = new object();
-        private readonly string _hostingPort;
         private bool _isRunning;
         private readonly string _endpointServiceName;
         private readonly Thread _hostThread;
@@ -47,7 +55,7 @@ namespace ServiceToServiceHost
         private readonly EventWaitHandle _eventWaitHandle = new EventWaitHandle(false, EventResetMode.AutoReset);
         public HostManager(string hostingPort, IKernel ninjectKernel = null)
         {            
-            _hostingPort = hostingPort;
+            HostingPort = hostingPort;
             createServiceBehavior(ninjectKernel);
             _endpointServiceName = typeof(TService).UnderlyingSystemType.Name;
             Connections = new List<IConnection<TConnectionData, TImplementedContract>>();
@@ -65,7 +73,7 @@ namespace ServiceToServiceHost
             var containsHost = kernel.GetBindings(typeof(IHostManager<TService, TImplementedContract, TConnectionData>));
             if (containsHost.Any())
             {
-                string error = string.Format("Обнаружена пользовательская регистрация IHostManager<{0}, {1}, {2}>", typeof(TService), typeof(TImplementedContract), typeof(TConnectionData));
+                string error =  $"Обнаружена пользовательская регистрация IHostManager<{typeof (TService)}, {typeof (TImplementedContract)}, {typeof (TConnectionData)}>";
                 error += Environment.NewLine +
                          "Не нужно регистрировать IHostManager повторно." + Environment.NewLine +
                          "Поскольку IHostManager регистрируется для решения зависимости в BaseService";
@@ -78,44 +86,48 @@ namespace ServiceToServiceHost
 
         private void host()
         {
-            Host = new ServiceHost<TService, TImplementedContract, TConnectionData>(_serviceBehavior, _hostingPort, _endpointServiceName);
+            Host = new ServiceHost<TService, TImplementedContract, TConnectionData>(_serviceBehavior, HostingPort, _endpointServiceName);
             _isRunning = Host.Run();
             _eventWaitHandle.Set();
         }
 
-        public void CreateNewConnectToRemoteHost(HostAdress remoteHostAdress, IncomingOperation incomingOperation, TConnectionData connectionData)
+        public IConnectionToRemoteHost<TImplementedContract> CreateNewConnectToRemoteHost(HostAdress remoteHostAdress, IncomingOperationStatus incomingOperationStatus, TConnectionData connectionData)
         {
             if (!_isRunning)
             {
                 L.Log.Warn("Current Host not running, CreateNewConnectToRemoteHost is Aborted");
-                return;
+                return null;
             }
 
-            lock (_connectionsSync)
+            lock (ConnectionsSync)
             {
-                var contains = Connections.FirstOrDefault(_ => _.Outcoming != null && _.Outcoming.Adress == remoteHostAdress);
+                var contains = Connections.FirstOrDefault(_ => _.RemoteHostAdress != null && _.RemoteHostAdress == remoteHostAdress);
                 if (contains != null)
                 {
                     contains.Data = connectionData;
-                    contains.IncomingOperation = incomingOperation;
+                    contains.IncomingOperationStatus = incomingOperationStatus;
+
                     if (contains.Outcoming == null)
                         contains.Outcoming = createConnectionToRemoteHost(remoteHostAdress);
-                    return;
+
+                    return contains.Outcoming;
                 }
 
-                Connections.Add(new Connection<TConnectionData, TImplementedContract>
+                var connection = new Connection<TConnectionData, TImplementedContract>
                 {
                     Outcoming = createConnectionToRemoteHost(remoteHostAdress),
                     Data = connectionData,
-                    IncomingOperation = incomingOperation,
+                    IncomingOperationStatus = incomingOperationStatus,
                     RemoteHostAdress = remoteHostAdress
-                });
+                };
+                Connections.Add(connection);
+                return connection.Outcoming;
             }
         }
 
         public void RemoveConnectToRemoteHost(Predicate<IConnectionData<TConnectionData>> predicate)
         {
-            lock (_connectionsSync)
+            lock (ConnectionsSync)
             {
                 var contains = Connections.FirstOrDefault(_ => predicate(_));
                 if (contains == null) 
@@ -127,10 +139,10 @@ namespace ServiceToServiceHost
             }
         }
 
-        public void CallRemoteServiceMethod(Predicate<IConnectionData<TConnectionData>> predicate, Action<IOutcomingConnection<TConnectionData, TImplementedContract>> action)
+        public void CallMethodAsync(Predicate<IConnectionData<TConnectionData>> predicate, Action<IOutcomingConnection<TConnectionData, TImplementedContract>> action)
         {
             List<IConnection<TConnectionData, TImplementedContract>> connections;         
-            lock (_connectionsSync)
+            lock (ConnectionsSync)
                 connections = Connections.Where(_ => predicate(_)).ToList();                 
             
             if(connections.Count == 0)
@@ -139,7 +151,6 @@ namespace ServiceToServiceHost
             Task.Factory.StartNew(() =>
                 Parallel.ForEach(connections, connection =>
                 {
-
                     if (connection.Outcoming == null)
                         return;
 
@@ -147,7 +158,7 @@ namespace ServiceToServiceHost
                 }));
         }
 
-#region ConnectionEvents
+        #region ConnectionEvents
         public void OnNewIcomingConnection(IConnection<TConnectionData, TImplementedContract> incomingConnection)
         {
             Task.Factory.StartNew(() =>
@@ -159,18 +170,18 @@ namespace ServiceToServiceHost
                 var newIcomingConnection = new NewIcomingConnectionEventArgs<TConnectionData>(incomingConnection);
                 handler(newIcomingConnection);
 
-                if (newIcomingConnection.CreateConnectionToThisRemoteHost)              
+                if (newIcomingConnection.CreateConnectionToThisRemoteHost && incomingConnection.Outcoming == null)                
                     incomingConnection.Outcoming = createConnectionToRemoteHost(incomingConnection.RemoteHostAdress);
-                
-                incomingConnection.IncomingOperation = newIcomingConnection.IncomingOperation;
+                               
+                incomingConnection.IncomingOperationStatus = newIcomingConnection.IncomingOperationStatus;
             });
         }
 
         private ConnectionToRemoteHost<TImplementedContract> createConnectionToRemoteHost(HostAdress remoteHostAdress)
         {
-            var connection = new ConnectionToRemoteHost<TImplementedContract>(remoteHostAdress, _hostingPort, _endpointServiceName);
-            connection.Connect.LostConnection += connectOnLostConnection;
-            connection.Connect.Reconnect += connectOnReconnect;
+            var connection = new ConnectionToRemoteHost<TImplementedContract>(remoteHostAdress, HostingPort, _endpointServiceName);
+            connection.Connect.LostConnection += onLostConnection;
+            connection.Connect.Connected += onConnected;
             return connection;
         }
 
@@ -179,46 +190,28 @@ namespace ServiceToServiceHost
             if (connection == null) 
                 return;
 
-            connection.Connect.LostConnection += connectOnLostConnection;
-            connection.Connect.Reconnect += connectOnReconnect;
+            connection.Connect.LostConnection -= onLostConnection;
+            connection.Connect.Connected -= onConnected;
         }
 
         private IConnection<TConnectionData, TImplementedContract> getConnection(Predicate<IConnection<TConnectionData, TImplementedContract>> predicate)
         {
-            lock (_connectionsSync)
+            lock (ConnectionsSync)
                 return Connections.FirstOrDefault(_ => predicate(_));
         }
-        private void connectOnReconnect(IConnectionToService<TImplementedContract> connectionToService)
+        private void onLostConnection(IConnectionToService<TImplementedContract> connectionToService)
         {
             var connection = getConnection(_ => _.Outcoming != null && _.Outcoming.Connect == connectionToService);
             if (connection != null)
-                onReconnect(connection);
+                LostConnection?.Invoke(connection);
         }
-        private void connectOnLostConnection(IConnectionToService<TImplementedContract> connectionToService)
+        private void onConnected(IConnectionToService<TImplementedContract> connectionToService)
         {
             var connection = getConnection(_ => _.Outcoming != null && _.Outcoming.Connect == connectionToService);
             if (connection != null)
-                onLostConnection(connection);
+                Connected?.Invoke(connection);
         }
-
-        private void onReconnect(IConnectionData<TConnectionData> connectionData)
-        {
-            var handler = Reconnect;
-            if (handler == null)
-                return;
-
-            handler(connectionData);
-        }
-
-        private void onLostConnection(IConnectionData<TConnectionData> connectionData)
-        {
-            var handler = LostConnection;
-            if (handler == null)
-                return;
-
-            handler(connectionData);
-        }
-#endregion
+        #endregion
 
         public void Dispose()
         {

@@ -50,7 +50,7 @@ namespace ServiceToServiceHost
     /// <typeparam name="TImplementedContract"></typeparam>
     public interface IConnection<TData, TImplementedContract> : IOutcomingConnection<TData, TImplementedContract>, IIncomingConnection<TData>, IDisposable
     {
-        IncomingOperation IncomingOperation { get; set; }
+        IncomingOperationStatus IncomingOperationStatus { get; set; }
     }
 
     internal class Connection<TData, TImplementedContract> : IConnection<TData, TImplementedContract>
@@ -65,11 +65,6 @@ namespace ServiceToServiceHost
         /// </summary>
         public HostAdress RemoteHostAdress { get; set; }
 
-        public IServiceSafeMethodCall<TImplementedContract> Outcoming0
-        {
-            get { return Outcoming.Connect; }
-        }
-
         /// <summary>
         /// исходящее соединение к удаленному Host(ту)
         /// </summary>
@@ -83,23 +78,17 @@ namespace ServiceToServiceHost
         /// <summary>
         /// статус входящих операций
         /// </summary>
-        public IncomingOperation IncomingOperation { get; set; }
+        public IncomingOperationStatus IncomingOperationStatus { get; set; }
 
         public void Dispose()
         {
-            if (Outcoming != null)
-            {
-                var disp = Outcoming.Connect as IDisposable;
-                if (disp != null)
-                    disp.Dispose();
-            }
+            var disp = Outcoming?.Connect as IDisposable;
+            disp?.Dispose();
 
-            if (Incoming != null)
-                Incoming.Channel.Abort();
+            Incoming?.Channel.Abort();
 
             var dispose = Data as IDisposable;
-            if (dispose != null)
-                dispose.Dispose();
+            dispose?.Dispose();
         }
     }
 }

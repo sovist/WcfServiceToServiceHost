@@ -41,7 +41,7 @@ namespace ServiceToServiceHost
 
         public bool Run()
         {
-            var hostTypeName = typeof(TService).UnderlyingSystemType.Name;
+            var hostTypeName = typeof (TService).UnderlyingSystemType.Name;
             try
             {
                 Instance.Open();

@@ -21,21 +21,25 @@ namespace ServiceToServiceHost
         /// </summary>
         event Action<NewIcomingConnectionEventArgs<TConnectionData>> IcomingConnection;
         /// <summary>
-        /// Происходит при новом подключении
+        /// Происходит при удачном переподключении
         /// </summary>
-        event Action<IConnectionData<TConnectionData>> Reconnect;
+        //event Action<IConnectionData<TConnectionData>> Reconnect;
         /// <summary>
         /// Происходит при разрыве связи
         /// </summary>
         event Action<IConnectionData<TConnectionData>> LostConnection;
+        /// <summary>
+        /// Происходит при удачном соединении
+        /// </summary>
+        event Action<IConnectionData<TConnectionData>> Connected;
 
         /// <summary>
         /// Подключится к удаленному хосту
         /// </summary>
         /// <param name="remoteHostAdress">Адрес удаленного хоста</param>
-        /// <param name="incomingOperation">Статус Входящих операций</param>
+        /// <param name="incomingOperationStatus">Статус Входящих операций</param>
         /// <param name="connectionData">Данные пользователя</param>
-        void CreateNewConnectToRemoteHost(HostAdress remoteHostAdress, IncomingOperation incomingOperation, TConnectionData connectionData);
+        IConnectionToRemoteHost<TImplementedContract> CreateNewConnectToRemoteHost(HostAdress remoteHostAdress, IncomingOperationStatus incomingOperationStatus, TConnectionData connectionData);
 
         /// <summary>
         /// Удалить соединение к удаленному хосту
@@ -48,7 +52,7 @@ namespace ServiceToServiceHost
         /// </summary>
         /// <param name="predicate">Условие вызова</param>
         /// <param name="action">Действие</param>
-        void CallRemoteServiceMethod(Predicate<IConnectionData<TConnectionData>> predicate, Action<IOutcomingConnection<TConnectionData, TImplementedContract>> action);
+        void CallMethodAsync(Predicate<IConnectionData<TConnectionData>> predicate, Action<IOutcomingConnection<TConnectionData, TImplementedContract>> action);
     }
 
 
@@ -56,7 +60,7 @@ namespace ServiceToServiceHost
     /// Статус Входящих операций
     /// </summary>
     [Flags]
-    public enum IncomingOperation
+    public enum IncomingOperationStatus
     {
         /// <summary>
         /// Запретить
@@ -77,7 +81,7 @@ namespace ServiceToServiceHost
         /// <summary>
         /// Статус Входящих операций
         /// </summary>
-        public IncomingOperation IncomingOperation { get; set; }
+        public IncomingOperationStatus IncomingOperationStatus { get; set; }
 
         /// <summary>
         /// Пользовательские данные соединения

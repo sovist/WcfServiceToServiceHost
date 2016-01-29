@@ -65,7 +65,7 @@ namespace ServiceToServiceHost
             var remoteHostAdress = new HostAdress(_fromIp, port);
 
             //сессию инициирует MessageHeaderNames.BaseServicePort, MessageHeaderNames.ClientServicePort ожидает 
-            //что пользователь сделает IncomingOperation.Allow, если нет blockingIncomingOperationException
+            //что пользователь сделает IncomingOperationStatus.Allow, если нет blockingIncomingOperationException
             //ожидаения для того что бы быстрее сделать коннэкт
             for (int i = 0; i < 50; i++)
             {
@@ -76,13 +76,13 @@ namespace ServiceToServiceHost
                 if (contains != null)
                 {
                     if (i == 0)
-                        L.Log.Info("Contains from: {0}, Connections: {1}, IncomingOperation: {2}", remoteHostAdress, _hostManagerInternalOperations.Connections.Count, contains.IncomingOperation);
+                        L.Log.Info("Contains from: {0}, Connections: {1}, IncomingOperationStatus: {2}, messageHeader: {3}", remoteHostAdress, _hostManagerInternalOperations.Connections.Count, contains.IncomingOperationStatus, messageHeader);
 
                     //обновляем
                     contains.Incoming = CurrentOperationContext;
                     CurrentConnection = contains;
-
-                    if (messageHeader == MessageHeaderNames.BaseServicePort || contains.IncomingOperation == IncomingOperation.Allow)
+                    
+                    if (messageHeader == MessageHeaderNames.BaseServicePort || contains.IncomingOperationStatus == IncomingOperationStatus.Allow)
                         return;
 
                     Thread.Sleep(30);
@@ -109,12 +109,11 @@ namespace ServiceToServiceHost
                 _hostManagerInternalOperations.Connections.Add(CurrentConnection);
 
             L.Log.Info("Add from: {0}, Connections: {1}", CurrentConnection.RemoteHostAdress, _hostManagerInternalOperations.Connections.Count);
-
-            _hostManagerInternalOperations.OnNewIcomingConnection(CurrentConnection);
+            _hostManagerInternalOperations.OnNewIcomingConnection(CurrentConnection);           
         }
         private void blockingIncomingOperationException()
         {
-            var error = string.Format("IncomingOperation is NotAllow, FromIp: {0}", _fromIp);
+            var error = $"IncomingOperationStatus is NotAllow, FromIp: {_fromIp}";
             throw new BlockingIncomingOperationException(error);
         }
 

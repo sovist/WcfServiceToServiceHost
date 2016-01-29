@@ -21,23 +21,24 @@ namespace Client
             var host1 = HostManagerFactory.Create<ExchangerService, IExchangerService, MyConnectionData>("8241", new StandardKernel(new TestServicesNinjectModules()));
             host1.IcomingConnection += host1OnIcomingConnection;
             host1.LostConnection += host1OnLostConnection;
-            host1.Reconnect += host1OnReconnect;
+            host1.Connected += host1OnConnected;
 
             var host2 = HostManagerFactory.Create<ExchangerService, IExchangerService, MyConnectionData>("8242", new StandardKernel(new TestServicesNinjectModules()));
             host2.IcomingConnection += host2OnIcomingConnection;
             host2.LostConnection += host2OnLostConnection;
-            host2.Reconnect += host2OnReconnect;
+            host2.Connected += host2OnConnected;
                      
-            host1.CreateNewConnectToRemoteHost(new HostAdress("localhost", "8242"), IncomingOperation.Allow, new MyConnectionData());
-            
+            var connect = host1.CreateNewConnectToRemoteHost(new HostAdress("localhost", "8242"), IncomingOperationStatus.Allow, new MyConnectionData());
+            connect.Connect.Connect();
+
             WaitHandle.WaitAny(new WaitHandle[] {EventWaitHost2OnIcomingConnection});
 
             for (int i = 0; i < 10; i++)
             {
-                host1.CallRemoteServiceMethod(data => true,
+                host1.CallMethodAsync(data => true,
                     connection =>
                     {
-                        var str = string.Format("from host1 {0}", DateTime.Now.ToShortTimeString());
+                        var str = $"from host1 {DateTime.Now.ToShortTimeString()}";
                         var status = connection.Outcoming.Connect.Call(_ => _.TestMethod(str));
 
                         if (status.CallStatus)
@@ -46,10 +47,10 @@ namespace Client
                             L.AppLog.Info("host1 service call, Status: {0}", status.CallStatus);
                     });
                 
-                host2.CallRemoteServiceMethod(data => true,
+                host2.CallMethodAsync(data => true,
                     connection =>
                     {
-                        var str = string.Format("from host2 {0}", DateTime.Now.ToShortTimeString());
+                        var str = $"from host2 {DateTime.Now.ToShortTimeString()}";
                         var status = connection.Outcoming.Connect.Call(_ => _.TestMethod(str));
 
                         if (status.CallStatus)
@@ -63,7 +64,7 @@ namespace Client
             Console.ReadKey();
         }
 
-        private static void host2OnReconnect(IConnectionData<MyConnectionData> connectionData)
+        private static void host2OnConnected(IConnectionData<MyConnectionData> connectionData)
         {
             L.AppLog.Info("To: {0}", connectionData.RemoteHostAdress);
         }
@@ -78,11 +79,11 @@ namespace Client
             L.AppLog.Info("From: {0}", incomingConnectionEventArgs.ConnectionData.RemoteHostAdress);
             incomingConnectionEventArgs.ConnectionData.Data = new MyConnectionData();
             incomingConnectionEventArgs.CreateConnectionToThisRemoteHost = true;
-            incomingConnectionEventArgs.IncomingOperation = IncomingOperation.Allow;
+            incomingConnectionEventArgs.IncomingOperationStatus = IncomingOperationStatus.Allow;
             EventWaitHost2OnIcomingConnection.Set();
         }
 
-        private static void host1OnReconnect(IConnectionData<MyConnectionData> connectionData)
+        private static void host1OnConnected(IConnectionData<MyConnectionData> connectionData)
         {
             L.AppLog.Info("To: {0}", connectionData.RemoteHostAdress);
         }
@@ -97,7 +98,7 @@ namespace Client
             L.AppLog.Info("From: {0}", incomingConnectionEventArgs.ConnectionData.RemoteHostAdress);
             incomingConnectionEventArgs.ConnectionData.Data = new MyConnectionData();
             incomingConnectionEventArgs.CreateConnectionToThisRemoteHost = true;
-            incomingConnectionEventArgs.IncomingOperation = IncomingOperation.Allow;
+            incomingConnectionEventArgs.IncomingOperationStatus = IncomingOperationStatus.Allow;
         }
     }
 
@@ -160,7 +161,7 @@ namespace Client
         }
     }
 
-    public class ServiceHostLogger : ServiceToServiceHost.ILogger
+    public class ServiceHostLogger : ILogger
     {
         private readonly NLog.Logger _logger;
         public ServiceHostLogger()
@@ -169,7 +170,7 @@ namespace Client
         }
         public void Append(string message)
         {
-            _logger.Info(string.Format("ServiceHost: {0}", message));
+            _logger.Info($"ServiceHost: {message}");
         }
     }
 }

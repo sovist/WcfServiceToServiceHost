@@ -1,7 +1,6 @@
 ﻿using System;
 using System.ServiceModel;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace ServiceToServiceHost
 {
@@ -58,14 +57,19 @@ namespace ServiceToServiceHost
         bool ConnectionIsOk { get; }
 
         /// <summary>
-        /// Происходит при удачном подключении
-        /// </summary>
-        event Action<IConnectionToService<TIService>> Reconnect;
-
-        /// <summary>
         /// Происходит при каждом разрыве разрыве соединения, или при не удачной попытке подключения
         /// </summary>
         event Action<IConnectionToService<TIService>> LostConnection;
+
+        /// <summary>
+        /// происходит при удачном подключении или пере подключении
+        /// </summary>
+        event Action<IConnectionToService<TIService>> Connected;
+
+        /// <summary>
+        /// подключится
+        /// </summary>
+        void Connect();
     }
 
     internal class ConnectionSettings
@@ -92,17 +96,20 @@ namespace ServiceToServiceHost
         private readonly Func<ChannelFactory<TIService>> _createNewServiceChannelFactory;
         private readonly Func<ChannelFactory<TIPingService>> _createNewPingChannelFactory;
         private readonly ConnectionSettings _connectionSettings;
-        private readonly Thread _connectionMonitorTask;
         private readonly string _endpointAddress;
+        private Thread _connectionMonitorTask;
         private bool _isDisposed;
-
-        public event Action<IConnectionToService<TIService>> Reconnect;
+  
+        /// <summary>
+        /// происходит при потере соединения
+        /// </summary>
         public event Action<IConnectionToService<TIService>> LostConnection;
+        /// <summary>
+        /// происходит при первом удачном соединении
+        /// </summary>
+        public event Action<IConnectionToService<TIService>> Connected;
 
-        public bool ConnectionIsOk
-        {
-            get { return _connectionIsOk; }
-        }
+        public bool ConnectionIsOk => _connectionIsOk;
 
         public ConnectionToService(Func<ChannelFactory<TIService>> createNewServiceChannelFactory,
             Func<ChannelFactory<TIPingService>> createNewPingChannelFactory, Action<TIPingService> pingAction,
@@ -112,17 +119,20 @@ namespace ServiceToServiceHost
             _createNewPingChannelFactory = createNewPingChannelFactory;
             _pingAction = pingAction;
             _connectionSettings = connectionSettings;
-
             _isDisposed = false;
-            _connectionIsOk = true;
 
             var serviceChannelFactory = _createNewServiceChannelFactory();
             _endpointAddress = serviceChannelFactory.Endpoint.Address.Uri.Authority;
 
-            _pingConnection = _createNewPingChannelFactory().CreateChannel();
             newConnect();
+        }
 
-            _connectionMonitorTask = new Thread(connectionMonitorTask) {IsBackground = true};
+        public void Connect()
+        {
+            if(_connectionMonitorTask != null)
+                return;
+
+            _connectionMonitorTask = new Thread(connectionMonitorTask) { IsBackground = true };
             _connectionMonitorTask.Start();
         }
 
@@ -131,92 +141,103 @@ namespace ServiceToServiceHost
         /// делает Reconnect если разрыв
         /// </summary>
         private void connectionMonitorTask()
-        {
+        {            
+            var pingConnectionIsOk = false;
             while (!_isDisposed)
             {
                 try
                 {
-                    if (!_connectionIsOk)
+                    if (!pingConnectionIsOk)
                         _pingConnection = _createNewPingChannelFactory().CreateChannel();
 
                     _pingAction(_pingConnection);
 
-                    if (!_connectionIsOk)
+                    if (!pingConnectionIsOk)
                     {
-                        newConnect();
-                        onReconnect();
-                        _connectionIsOk = true;
+                        newConnect(DateTime.UtcNow);
+                        onConnected();
+                        pingConnectionIsOk = true;
                     }
                 }
                 catch
                 {
-                    if (_connectionIsOk)
+                    if (pingConnectionIsOk)
                     {
                         onLostConnection();
-                        _connectionIsOk = false;
-                    }
+                        pingConnectionIsOk = false;
+                    }                                
                 }
                 Thread.Sleep(_connectionSettings.PingIntervalMilliseconds);
             }
         }
 
+        private void newConnect(DateTime utcNow)
+        {
+            var interval = getOperationIntervalMillisecondsIfLostConnection(utcNow);
+            if (interval > 0)
+            {
+                L.Log.Info("getOperationIntervalMillisecondsIfLostConnection {0}", interval);
+                return;
+            }
+
+            newConnect();
+        }
         private void newConnect()
         {
             _serviceConnection = _createNewServiceChannelFactory().CreateChannel();
             L.Log.Info("Create new connection to {0}", _endpointAddress);
         }
-        
-        private void onReconnect()
+
+        private void onConnected()    
         {
-            var handler = Reconnect;
-            if (handler == null)
-                return;
-
-            Task.Factory.StartNew(() => handler(this));
+            Connected?.Invoke(this);
         }
-
         private void onLostConnection()
         {
-            var handler = LostConnection;
-            if (handler == null)
-                return;
-
-            Task.Factory.StartNew(() => handler(this));
+            LostConnection?.Invoke(this);
         }
 
         public IMethodRezult<TResult> Call<TResult>(Func<TIService, TResult> action)
         {
             lock (_syncServiceCallMethod)
             {
-                for (int tryCounter = 0;
+                for (var tryCounter = 0;
                     tryCounter < _connectionSettings.MaxTryCountCallServiceMethodIfLostConnection && !_isDisposed;
                     tryCounter++)
                 {
                     var startUtcTime = DateTime.UtcNow;
                     try
                     {
-                        return new Rezult<TResult>(true, action(_serviceConnection));
+                        var res = new Rezult<TResult>(true, action(_serviceConnection));
+                        _connectionIsOk = true;
+                        return res;
                     }
                     catch (Exception ex)
                     {
-                        L.Log.Warn("Try: {0}/{1}, To: {2}, ExType: {3}", tryCounter + 1,
-                            _connectionSettings.MaxTryCountCallServiceMethodIfLostConnection, _endpointAddress,
-                            ex.GetType());
-
                         _connectionIsOk = false;
+                        
+                        L.Log.Warn("Try: {0}/{1}, To: {2}, ExType: {3}", tryCounter + 1, _connectionSettings.MaxTryCountCallServiceMethodIfLostConnection, _endpointAddress, ex.GetType());
+
                         if ((tryCounter - _connectionSettings.MaxTryCountCallServiceMethodIfLostConnection) != 1)
-                            threadSleep(startUtcTime);
+                            delay(startUtcTime);
+
+                        newConnect(DateTime.UtcNow);
                     }
                 }
                 return new Rezult<TResult>(false, default(TResult));
             }
         }
 
-        private void threadSleep(DateTime startUtcTime)
+        private void delay(DateTime startUtcTime)
         {
-            var delayMilliseconds = _connectionSettings.OperationTimeOutMiliseconds - (DateTime.UtcNow - startUtcTime).Milliseconds;
+            var delayMilliseconds = getOperationIntervalMillisecondsIfLostConnection(startUtcTime);
             if (delayMilliseconds > 0)
                 Thread.Sleep(delayMilliseconds);
+        }
+
+        private int getOperationIntervalMillisecondsIfLostConnection(DateTime utcTime)
+        {
+            return (DateTime.UtcNow - utcTime.AddMilliseconds(_connectionSettings.OperationTimeOutMiliseconds)).Milliseconds;
         }
 
         public IMethodCallStatus Call(Action<TIService> action)

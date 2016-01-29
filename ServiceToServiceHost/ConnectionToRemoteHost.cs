@@ -24,20 +24,24 @@ namespace ServiceToServiceHost
     public interface IConnectionToRemoteHost<out TImplementedContract> : IDisposable
     {
         /// <summary>
-        /// адрес удаленного хоста
+        /// Адрес удаленного хоста
         /// </summary>
         HostAdress Adress { get; }
 
+        /// <summary>
+        /// Подключение
+        /// </summary>
         IConnectionToService<TImplementedContract> Connect { get; }
     }
 
     internal class ConnectionToRemoteHost<TImplementedContract> : IConnectionToRemoteHost<TImplementedContract>
     {
-        public HostAdress Adress { get; private set; }
-        public IConnectionToService<TImplementedContract> Connect { get; private set; }
-        
+        public HostAdress Adress { get; }
+        public IConnectionToService<TImplementedContract> Connect { get; }
+
         private readonly EndpointAddress _clientServiceEndpointAddress;
         private readonly EndpointAddress _baseServiceEndpointAddress;
+
         public ConnectionToRemoteHost(HostAdress adress, string localHostPort, string endpointServiceName)
         {
             Adress = adress;
